@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<title>Cricket batting innnings charts</title>
+<style type="text/css">
+  body {
+    margin: 0em auto;
+    max-width: 50em;
+  }
+</style>
+<noscript>
+  This page requires JavaScript to be enabled in order to work.
+</noscript>
+<h1>Cricket batting innings charts</h1>
+<p>
+  This shows, for the top 50 run scorers in men's Test cricket history, their
+  runs per innings - in order - over their career, and the number of innings per
+  century they had at that point in their career.
+</p>
+<div id="toc"></div>
+<div id="charts"></div>
+<script type="module">
+  import * as Plot from "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6/+esm";
+
+  function chart(player) {
+    const plot = Plot.plot({
+      marginLeft: 70,
+      marginRight: 50,
+      title: player.name,
+      color: {scheme: "spectral" },
+      x: { axis: null },
+      y: { axis: "right", label: "Runs" },
+      marks: [
+        Plot.barY(player.innings, { x: "index", y: "runs", fill: () => 1 }),
+        Plot.ruleY([100], { strokeOpacity: 1 }),
+        Plot.ruleY([50, 150], { strokeOpacity: 0.1 }),
+        Plot.ruleY([400], { strokeOpacity: 0 }),
+        () =>
+        Plot.plot({
+          marginLeft: 70,
+          marginRight: 50,
+          x: { axis: null },
+          y: { axis: "left", nice: true, line: true, label: "Innings per century" },
+          marks: [
+            Plot.lineY(player.innings, { x: "index", y: "perCentury", strokeOpacity: 0.3 }),
+          ],
+        })
+      ]
+    })
+
+    const plotDiv = document.createElement("div");
+    plotDiv.append(plot);
+    plotDiv.setAttribute("id", player.id);
+    document.querySelector("#charts").append(plotDiv);
+  }
+
+  const innings = await (await fetch("./innings.json")).json();
+  const players = {};
+
+  innings.forEach(row => {
+    if (!players[row.player_id]) {
+      players[row.player_id] = { id: row.player_id, name: row.player, innings: [], centuries: 0 };
+    }
+
+    if (row.runs >= 100) {
+      players[row.player_id].centuries++;
+    }
+
+    const centuries = players[row.player_id].centuries;
+
+    players[row.player_id].innings.push({
+      index: row.innings_count,
+      runs: row.runs,
+      perCentury: centuries > 0 ? row.innings_count / centuries : 0,
+    });
+  });
+
+  Object.keys(players).forEach(id => {
+    players[id].total = players[id].innings.reduce((acc, innings) => acc + innings.runs, 0);
+  });
+
+  const byTotal = Object.keys(players).sort((a, b) => players[b].total - players[a].total)
+
+  byTotal.forEach((id, i) => {
+    const player = players[id];
+    const link = document.createElement("a");
+    link.append(player.name);
+    link.setAttribute("href", "#" + id);
+    console.log(link);
+    document.querySelector("#toc").append(link);
+
+    if (byTotal.length > i + 1) {
+      document.querySelector("#toc").append(" / ");
+    }
+
+    chart(player);
+  });
+</script>
